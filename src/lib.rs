@@ -49,7 +49,7 @@
 //! /Volumes/VMware Shared Folders
 //! ```
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
@@ -58,7 +58,8 @@ mod windows;
 
 use std::path::PathBuf;
 
-#[cfg(target_os = "linux")]
+// #[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use linux as sys;
 #[cfg(target_os = "macos")]
 use macos as sys;
@@ -150,13 +151,23 @@ mod tests {
     #[test]
     fn mountinfosworks() {
         let infos = mountinfos().unwrap();
+        dbg!(&infos);
         assert!(infos.len() > 0);
         assert!(infos.iter().any(|i| if i.path == root() {
-            assert!(i.size.unwrap_or_default() > 1024 * 1024); // > 1Mb
-            assert!(i.avail.unwrap_or_default() < i.size.unwrap_or_default());
-            assert!(i.free.unwrap_or_default() < i.size.unwrap_or_default());
+            println!("found root: {}, {:?}", i.path.display(), i);
+            if cfg!(target_os = "android") {
+                // at least on my android, size, avail & free is Some(0)
+                assert!(i.size.is_some());
+                assert!(i.avail.unwrap() <= i.size.unwrap());
+                assert!(i.free.unwrap() <= i.size.unwrap());
+            } else {
+                assert!(i.size.unwrap_or_default() > 1024 * 1024); // > 1Mb
+                assert!(i.avail.unwrap_or_default() < i.size.unwrap_or_default());
+                assert!(i.free.unwrap_or_default() < i.size.unwrap_or_default());
+            }
             true
         } else {
+            println!("found not root: {}, {:?}", i.path.display(), i);
             false
         }));
         for mountinfo in &infos {
